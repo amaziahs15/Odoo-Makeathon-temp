@@ -37,10 +37,18 @@ def main():
     if not 1 <= args.port <= 65535:
         parser.error("Port must be between 1 and 65535.")
 
-    python = ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-    if not python.exists():
+    def find_venv_python():
+        for rel in ("Scripts/python.exe", "bin/python.exe", "bin/python"):
+            candidate = ROOT / ".venv" / rel
+            if candidate.exists():
+                return candidate
+        return None
+
+    python = find_venv_python()
+    if not python:
         print("Creating the project's Python environment…", flush=True)
         venv.EnvBuilder(with_pip=True).create(ROOT / ".venv")
+        python = find_venv_python() or (ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
 
     if subprocess.run([str(python), "-m", "pip", "--version"], capture_output=True).returncode:
         subprocess.run([str(python), "-m", "ensurepip", "--upgrade"], cwd=ROOT, check=True)
