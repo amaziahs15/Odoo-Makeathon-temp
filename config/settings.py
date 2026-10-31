@@ -1,8 +1,11 @@
-"""Local-first Django settings for the Brightloop subscription demo."""
+﻿"""Local-first and deployment-ready Django settings for Brightloop."""
 
 import os
 from pathlib import Path
-
+try:
+    import dj_database_url
+except ImportError:
+    dj_database_url = None
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -22,7 +25,11 @@ SECRET_KEY = os.environ.get(
     "SECRET_KEY", "local-only-insecure-key-change-before-any-shared-deployment"
 )
 DEBUG = env_bool("DEBUG", True)
-ALLOWED_HOSTS = env_csv("ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]")
+ALLOWED_HOSTS = env_csv("ALLOWED_HOSTS", "localhost,127.0.0.1,[::1],.vercel.app")
+CSRF_TRUSTED_ORIGINS = env_csv(
+    "CSRF_TRUSTED_ORIGINS",
+    "https://*.vercel.app,http://localhost:8000,http://127.0.0.1:8000,http://127.0.0.1:8080"
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -43,6 +50,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -72,17 +80,27 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": os.environ.get("DATABASE_PATH", str(BASE_DIR / "db.sqlite3")),
-        "OPTIONS": {
-            "transaction_mode": "IMMEDIATE",
-            "timeout": 20,
-        },
-        "TEST": {"NAME": os.environ.get("TEST_DATABASE_PATH")},
+database_url = os.environ.get("DATABASE_URL")
+if database_url and dj_database_url:
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=database_url,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": os.environ.get("DATABASE_PATH", str(BASE_DIR / "db.sqlite3")),
+            "OPTIONS": {
+                "transaction_mode": "IMMEDIATE",
+                "timeout": 20,
+            },
+            "TEST": {"NAME": os.environ.get("TEST_DATABASE_PATH")},
+        }
+    }
 
 AUTH_USER_MODEL = "accounts.User"
 AUTHENTICATION_BACKENDS = ["django.contrib.auth.backends.ModelBackend"]
@@ -101,6 +119,7 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+WHITENOISE_USE_FINDERS = True
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -119,3 +138,4 @@ EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
 LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "insights:dashboard"
 LOGOUT_REDIRECT_URL = "insights:dashboard"
+
